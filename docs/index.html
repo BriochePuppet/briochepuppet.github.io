@@ -1,0 +1,140 @@
+<!doctype html>
+
+<!--
+Copyright (C) YuqiaoZhang(HanetakaChou)
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>
+-->
+
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown-dark.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/dark.min.css">
+
+    <style>
+        .mermaid {
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-start;
+        }
+
+        .graphviz {
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-start;
+        }
+    </style>
+</head>
+
+<body class="markdown-body">
+
+    <main id="markdown-content"></main>
+
+    <script type="module">
+        import markdownIt from 'https://cdn.jsdelivr.net/npm/markdown-it/+esm';
+        import markdownItTaskLists from 'https://cdn.jsdelivr.net/npm/markdown-it-task-list/+esm';
+        import markdownItKatex from 'https://cdn.jsdelivr.net/npm/@vscode/markdown-it-katex/+esm';
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid/+esm';
+        import { instance } from 'https://cdn.jsdelivr.net/npm/@viz-js/viz/+esm'
+        import hljs from 'https://cdn.jsdelivr.net/npm/highlight.js/lib/core/+esm'
+        import plaintext from 'https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/plaintext/+esm'
+        import cpp from 'https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/cpp/+esm'
+        import matlab from 'https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/matlab/+esm'
+        import glsl from 'https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/glsl/+esm'
+
+        mermaid.initialize({ startOnLoad: false });
+
+        hljs.registerLanguage('plaintext', plaintext);
+        hljs.registerLanguage('cpp', cpp);
+        hljs.registerLanguage('matlab', matlab);
+        hljs.registerLanguage('glsl', glsl);
+        hljs.registerLanguage('hlsl', glsl);
+
+        let pathName = new URLSearchParams(window.location.search).get('file');
+        let dirName = '';
+        if (pathName) {
+            const segments = pathName.split('/');
+            segments.pop();
+            dirName = segments.join('/');
+        }
+        else {
+            pathName = 'https://raw.githubusercontent.com/HanetakaChou/Brioche-Puppet/refs/heads/master/README.md';
+            dirName = 'https://raw.githubusercontent.com/HanetakaChou/Brioche-Puppet/refs/heads/master'
+        }
+
+        function markdownItMermaidGraphviz(md, options) {
+            const defaultFenceRender = md.renderer.rules.fence || function (tokens, idx, options, env, self) {
+                return self.renderToken(tokens, idx, options);
+            };
+
+            md.renderer.rules.fence = function (tokens, idx, options, env, self) {
+                const token = tokens[idx];
+                const tokenInfo = token.info.trim();
+                const tokenContent = token.content;
+                if (tokenInfo === 'mermaid') {
+                    return `<div class="mermaid">${tokenContent}</div>`;
+                }
+                else if (tokenInfo === 'graphviz') {
+                    return `<div class="graphviz">${tokenContent}</div>`;
+                }
+                else {
+                    return defaultFenceRender(tokens, idx, options, env, self);
+                }
+            };
+
+            const defaultImageRender = md.renderer.rules.image || function (tokens, idx, options, env, self) {
+                return self.renderToken(tokens, idx, options);
+            };
+
+            md.renderer.rules.image = function (tokens, idx, options, env, self) {
+                const token = tokens[idx];
+                const srcIndex = token.attrIndex("src");
+
+                if (srcIndex >= 0) {
+                    const originalSrc = token.attrs[srcIndex][1];
+                    token.attrs[srcIndex][1] = `${dirName ? dirName + '/' : ''}${originalSrc}`;
+                }
+
+                return defaultImageRender(tokens, idx, options, env, self);
+            };
+        }
+
+        const md = markdownIt().use(markdownItTaskLists.default).use(markdownItKatex.default).use(markdownItMermaidGraphviz);
+
+        fetch(`${pathName}`)
+            .then(response => {
+                return response.text();
+            })
+            .then(markdownText => {
+                return md.render(markdownText);
+            })
+            .then(markdownHTML => {
+                document.getElementById("markdown-content").innerHTML = markdownHTML;
+            })
+            .then(() => {
+                mermaid.init();
+            })
+            .then(() => {
+                instance()
+                    .then(viz => {
+                        for (let element of document.getElementsByClassName("graphviz")) {
+                            element.innerHTML = viz.renderSVGElement(element.textContent).outerHTML;
+                        }
+                    });
+            })
+            .then(() => {
+                hljs.highlightAll();
+            });
+    </script>
+
+</body>
+
+</html>
